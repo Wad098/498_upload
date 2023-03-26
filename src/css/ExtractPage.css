@@ -256,7 +256,22 @@ input.Enddate{
   margin: 0;
   margin-right: 5px;
   cursor: pointer;
+<<<<<<< HEAD:data_explorer/src/css/ExtractPage.css
+}
+
+.ExportButton {
+  margin-top: 20px;
+  background-color: #1890ff;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+=======
 } 
+>>>>>>> master:src/css/ExtractPage.css
 
 .ExportButton:hover {
   background-color: #40a9ff;
