@@ -5,8 +5,12 @@ import { ImBin } from 'react-icons/im';
 import Modal from "./Modal";
 import DashBoards from "./DashBoards";
 import DashBoardCharts from "./DashBoardCharts";
+import useAuth from "../hooks/useAuth";
 import Axios from 'axios';
 import useAxiosPrivate from "../hooks/useAxiosPrivate";
+import ReturnButton from "./ReturnButton";
+import SaveButton from "./SaveButton";
+
  
 function DashBoards2(props) {
     var data2 = [
@@ -52,14 +56,16 @@ function DashBoards2(props) {
             14
         ]
         }
-
+    const { auth } = useAuth();
+    const User = auth.user
+    const axiosPrivate = useAxiosPrivate();
     const [currTime, setcurrTime] = useState();
     const [plotType, setplotType] = useState();
     const [val, setVal] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isOpenChart, setIsOpenChart] = useState(false);
     const [isOpenDash2, setIsOpenDash2] = useState(true);
-    const [showJsondata,setshowJsondata] = useState({});
+    const [showJsondata,setshowJsondata] = useState("LineChart");
     const [curIndex,setCurIndex] = useState(null)
     const [Linexy, setLinexy] = useState(data1); // line chart data
     const [generatedExcuse, setGeneratedExcuse] = useState(data2); // wind rose data
@@ -67,10 +73,10 @@ function DashBoards2(props) {
     var index = 0;
 
     useEffect(() => {
-        Axios.get(`http://127.0.0.1:5000/lastest-status/000001`).then((res) => {
+        Axios.get(`http://127.0.0.1:7000/lastest-status/000001`).then((res) => {
           setcurrTime(res.data.result.TIMESTAMP)
         })
-        setshowJsondata(JSON.stringify(props.dict[0]))
+        setshowJsondata(JSON.stringify(props.dict[curIndex]))
       }, [])
 
     
@@ -89,47 +95,48 @@ function DashBoards2(props) {
     }
  
     const handleDelete = () => {
-        props.datelete(curIndex)
+        props.delete(curIndex)
         setIsOpen(false);
     }
 
-    // const handleSave = () => {
-    //     let isMounted = true;
-    //         const controller = new AbortController();
-    
-    //         const saveDashboard = async () => {
-    //             try {
-    //                 const response = await axiosPrivate.put('/dashboards', {
-    //                     signal: controller.signal
-    //                 });
-    //                 const newList = [...createList, response.data];
-    //                 console.log("newList: "+newList);
-    //                 isMounted && !newList && setcreateList(newList)
-    //             } catch (err) {
-    //                 console.error(err);
-    //             }
-    //         }
-    
-    //         saveDashboard()
+    const handleSave = () => {
+        let isMounted = true;
+        const controller = new AbortController();
 
-    //         return () => {
-    //             isMounted = false;
-    //             controller.abort();
-    //         }
-    // }
+        const saveDashboard = async () => {
+            try {
+                const response = await axiosPrivate.put('/dashboards', {
+                    'username': User,
+                    'plotGraph': props.dict
+                },{
+                    signal: controller.signal
+                });
+                console.log("saveDashboard: "+response.data)
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        if (User) saveDashboard()
+
+        return () => {
+            isMounted = false;
+            controller.abort();
+        }
+    }
 
     // const url = "http://planwebapi-env.eba-khpxdqbu.us-east-1.elasticbeanstalk.com/"
-    const url = "http://127.0.0.1:5000/";
+    const url = "http://127.0.0.1:7000/";
 
-
-    const fetchLinechart = (dev_id, ftime, var_t) => {
+     const fetchLinechart = (dev_id, ftime, var_t) => {
         var dat_t = {
           "TIMESTAMP_F": ftime,//20220423074600,
           "TIMESTAMP_T": currTime,
           "Varible": var_t//"RH_Avg"
         }
+        // console.log("fetchLinechart dat_t: "+JSON.stringify(dat_t.Varible))
         Axios.post(`${url}dashboard_line_xy/${dev_id}`, dat_t).then(
-          (resp) => {
+            (resp) => {
             setLinexy(resp.data);
           }
         )
@@ -140,21 +147,24 @@ function DashBoards2(props) {
         "TIMESTAMP_F": 202201230746,
         "TIMESTAMP_T": currTime
     }
+    // console.log("fetchExcuse dat_t: "+JSON.stringify(dat_t))
     Axios.post(`${url}dashboard_wr/${excuse}`, dat_t).then(
         (resp) => {
-        setGeneratedExcuse(resp.data.res);
+            setGeneratedExcuse(resp.data.res);
         }
-    );
+        );
     };
+
     const fetchHg = (dev_id, ftime, var_t) => {
     var dat_t = {
         "TIMESTAMP_F": ftime,//200408080000,
         "TIMESTAMP_T": currTime,
         "Varible": var_t//"RH_Avg"
     }
+    // console.log("fetchHg dat_t: "+ JSON.stringify(dat_t.Varible))
     Axios.post(`${url}dashboard_hg/${dev_id}`, dat_t).then(
         (resp) => {
-        sethisGramxy(resp.data);
+            sethisGramxy(resp.data);
         }
     )
     };
@@ -272,7 +282,6 @@ function DashBoards2(props) {
         </div>
     );
     };
-
 
     function max2D(list_t) {
     // let newArr = list_t.flat(Infinity)
@@ -436,32 +445,43 @@ function DashBoards2(props) {
 
     };
 
-    function handleVariables(data) {
-        setshowJsondata(JSON.stringify(data))
-        const alldata = showJsondata
-        const alldataObj = JSON.parse(alldata)
-        setplotType(alldataObj.plotType)
-        const plottype = alldataObj.plotType
-        const fromValue = parseInt(alldataObj.fromTime.replace("T", "").replace(/[-:]/g, ""));
-        const toValue = parseInt(alldataObj.toTime.replace("T", "").replace(/[-:]/g, ""));
-        const station = alldataObj.station
-        const variable = alldataObj.variable
-        if (plottype=="LineChart") {
-            fetchLinechart(station,fromValue,variable)
-        }
-        else if (plottype=="Histogram") {
-            fetchHg(station, fromValue, variable)
-        } 
-        else if (plottype=="WindRose") {
-            fetchExcuse(station,fromValue,toValue)
-        }
+    useEffect( () => {
+        try{
+            const alldataObj = JSON.parse(showJsondata)
+            setplotType(alldataObj.plotType)
+            const plottype = alldataObj.plotType
+            const fromValue = parseInt(alldataObj.fromTime.replace("T", "").replace(/[-:]/g, ""));
+            const toValue = parseInt(alldataObj.toTime.replace("T", "").replace(/[-:]/g, ""));
+            const station = alldataObj.station
+            const variable = alldataObj.variable
+            if (plottype=="LineChart") {
+                fetchLinechart(station,fromValue,variable)
+            }
+            else if (plottype=="Histogram") {
+                fetchHg(station, fromValue, variable)
+            } 
+            else if (plottype=="WindRose") {
+                fetchExcuse(station,fromValue,toValue)
+            }
+        }catch (err){}
+        setIsOpenChart(true)
+    },[showJsondata])
 
+    async function handleVariables(data) {
+        if (JSON.stringify(data)==showJsondata) setIsOpenChart(true)
+        setshowJsondata(JSON.stringify(data))
     }
 
     const handleGraph = (garphType) => {
-        if (garphType=="LineChart") return graph_line(Linexy)
-        if (garphType=="Histogram") return graph_hisGram(hisGramxy)
-        if (garphType=="WindRose") return graph_wr(generatedExcuse)
+        if (garphType=="LineChart") {
+            return graph_line(Linexy)
+        }
+        else if (garphType=="Histogram"){
+            return graph_hisGram(hisGramxy)
+        }
+        else if (garphType=="WindRose"){
+            return graph_wr(generatedExcuse)
+        }
     }
 
     if (!isOpenDash2) return <DashBoards />
@@ -470,8 +490,9 @@ function DashBoards2(props) {
             <div className='DataBoard'>
                 <div className='DashBoardContent'>
                     <div>
-                        <h1>DashBoards</h1>
-                        <button className="CreateMoreButton" onClick={() => handleAdd()}>RETURN</button>
+                        <h1>{User}'s DashBoards</h1>
+                        <ReturnButton openReturn={props.showReturn} setBack={() => handleAdd()}/>
+                        {/* <button className="CreateMoreButton" onClick={() => handleAdd()}>RETURN</button> */}
                     </div>
  
                     <div className='DigarmBoard'>
@@ -483,7 +504,7 @@ function DashBoards2(props) {
                                             <div className='actions'>
                                                 {data.boardName}
                                                 {/* <input value={data} onChange={e=>handleChange(e,i)} /> */}
-                                                <button onClick={() => { handleVariables(data); setIsOpenChart(true) }}>Open Created Charts</button>
+                                                <button onClick={() => { handleVariables(data) }}>Open Created Charts</button>
                                             </div>
                                             <button className='cardBin' onClick={() => { setIsOpen(true); setCurIndex(index) }}><ImBin /></button>
                                         </div>
@@ -494,9 +515,7 @@ function DashBoards2(props) {
                             <DashBoardCharts openChart={isOpenChart} onCancel={() => { setIsOpenChart(false) }}>{showJsondata}{handleGraph(plotType)}</DashBoardCharts>
                             <Modal open={isOpen} onCancel={() => { setIsOpen(false); }} onClose={() => { handleDelete() }} action="Delete">Are you sure to Delete?</Modal>
                         </div>
-                        <div className="SaveButtonDad">
-                            <button className="SaveButton">SAVE</button>
-                        </div>
+                        <SaveButton openSave={props.showSave} setSave={handleSave}/>
                     </div>
                 </div>
             </div>
